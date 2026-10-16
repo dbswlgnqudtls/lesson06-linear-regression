@@ -91,6 +91,67 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# 기울기를 "100년당 변화"로 환산해 전체 기간과 최근 구간 비교
+st.subheader("📈 100년에 몇 도 오를까?")
+
+
+def trend_card(title, period, slope_per_year, color):
+    per100 = slope_per_year * 100
+    per10 = slope_per_year * 10
+    word = "상승" if per100 >= 0 else "하락"
+    return f"""
+    <div style="text-align:center; padding:1rem 0.5rem; border-radius:14px;
+                border:2px solid {color}; background:{color}22;">
+        <div style="font-size:1.1rem; font-weight:700;">{title}</div>
+        <div style="font-size:0.85rem; color:gray; margin-bottom:0.4rem;">{period}</div>
+        <div style="font-size:1.1rem;">100년에</div>
+        <div style="font-size:3.4rem; font-weight:900; line-height:1.1; color:{color};">{per100:+.2f} ℃</div>
+        <div style="font-size:1.1rem; font-weight:700;">{word}</div>
+        <div style="font-size:0.9rem; color:gray; margin-top:0.4rem;">(10년마다 약 {per10:+.2f} ℃)</div>
+    </div>
+    """
+
+
+recent = yearly[yearly["연도"] > yearly["연도"].max() - RECENT_YEARS]
+col_all, col_recent = st.columns(2)
+
+col_all.markdown(
+    trend_card(
+        "전체 기간 기준",
+        f"{int(yearly['연도'].min())}~{int(yearly['연도'].max())}년 · {len(yearly)}개 연도",
+        slope,
+        "#1f77b4",
+    ),
+    unsafe_allow_html=True,
+)
+
+if len(recent) >= 2:
+    rx = recent["연도"].to_numpy(dtype=float)
+    ry = recent["연평균기온"].to_numpy(dtype=float)
+    r_slope, r_intercept = np.polyfit(rx, ry, 1)
+    col_recent.markdown(
+        trend_card(
+            f"최근 {RECENT_YEARS}년 기준",
+            f"{int(recent['연도'].min())}~{int(recent['연도'].max())}년 · {len(recent)}개 연도",
+            r_slope,
+            "#d62728",
+        ),
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        f"**한 줄 요약:** 전체 기간 추세로는 100년에 약 **{slope * 100:+.2f} ℃**, "
+        f"최근 {RECENT_YEARS}년 추세로는 100년에 약 **{r_slope * 100:+.2f} ℃** 속도입니다."
+    )
+    if slope > 0 and r_slope > 0:
+        st.write(f"최근 {RECENT_YEARS}년의 변화 속도는 전체 기간의 약 **{r_slope / slope:.1f}배**입니다.")
+    st.caption(
+        f"'100년에 몇 도'는 지금의 기울기가 100년간 이어진다고 가정해 환산한 값입니다. "
+        f"최근 {RECENT_YEARS}년은 표본이 적어 값이 크게 흔들릴 수 있습니다."
+    )
+else:
+    col_recent.warning("최근 구간의 데이터가 부족합니다.")
+
+
 # 산점도 + 회귀 직선 + 예상 지점
 x_min = min(x.min(), year)
 x_max = max(x.max(), year)
@@ -121,54 +182,6 @@ st.plotly_chart(fig, use_container_width=True)
 
 # 상관계수
 st.metric("상관계수 (연도 vs 연평균기온)", f"{r:.3f}")
-
-# 기울기를 "100년당 변화"로 환산해 전체 기간과 최근 20년 비교
-st.subheader("100년에 몇 도 오르는가?")
-
-
-def big_number(title, value, note):
-    return f"""
-    <div style="text-align:center; padding:0.8rem 0.4rem; border:1px solid #8884; border-radius:12px;">
-        <div style="font-size:1.05rem; color:gray;">{title}</div>
-        <div style="font-size:3rem; font-weight:800; line-height:1.15;">{value}</div>
-        <div style="font-size:0.9rem; color:gray;">{note}</div>
-    </div>
-    """
-
-
-recent = yearly[yearly["연도"] > yearly["연도"].max() - RECENT_YEARS]
-col_all, col_recent = st.columns(2)
-
-col_all.markdown(
-    big_number(
-        "전체 기간",
-        f"{slope * 100:+.2f} ℃ / 100년",
-        f"{int(yearly['연도'].min())}~{int(yearly['연도'].max())}년 · {len(yearly)}개 연도",
-    ),
-    unsafe_allow_html=True,
-)
-
-if len(recent) >= 2:
-    rx = recent["연도"].to_numpy(dtype=float)
-    ry = recent["연평균기온"].to_numpy(dtype=float)
-    r_slope, r_intercept = np.polyfit(rx, ry, 1)
-    col_recent.markdown(
-        big_number(
-            f"최근 {RECENT_YEARS}년",
-            f"{r_slope * 100:+.2f} ℃ / 100년",
-            f"{int(recent['연도'].min())}~{int(recent['연도'].max())}년 · {len(recent)}개 연도",
-        ),
-        unsafe_allow_html=True,
-    )
-    ratio = r_slope / slope if slope != 0 else float("nan")
-    if np.isfinite(ratio):
-        st.write(f"최근 {RECENT_YEARS}년의 상승 속도는 전체 기간의 약 **{ratio:.1f}배**입니다.")
-    st.caption(
-        f"최근 {RECENT_YEARS}년은 표본이 적어 기울기가 해마다 크게 흔들릴 수 있습니다. "
-        "또한 '100년당'은 현재 추세가 100년간 이어질 경우로 환산한 값입니다."
-    )
-else:
-    col_recent.warning("최근 구간의 데이터가 부족합니다.")
 
 st.info(
     f"회귀 직선을 만든 데이터: **{len(yearly)}개 연도**, "
