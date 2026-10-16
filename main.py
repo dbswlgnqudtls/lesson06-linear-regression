@@ -56,7 +56,29 @@ slope, intercept = np.polyfit(x, y, 1)
 r = float(np.corrcoef(x, y)[0, 1])
 
 # 연도 슬라이더와 예상 기온
-year = st.slider("예상할 연도를 고르세요", min_value=1900, max_value=2100, value=2050, step=1)
+YEAR_MIN, YEAR_MAX = 1900, 2100
+
+if "year_slider" not in st.session_state:
+    st.session_state["year_slider"] = 2050
+if "year_input" not in st.session_state:
+    st.session_state["year_input"] = st.session_state["year_slider"]
+
+
+def sync_from_slider():
+    st.session_state["year_input"] = st.session_state["year_slider"]
+
+
+def sync_from_input():
+    st.session_state["year_slider"] = st.session_state["year_input"]
+
+
+col_s, col_n = st.columns([3, 1])
+col_s.slider("예상할 연도를 고르세요", min_value=YEAR_MIN, max_value=YEAR_MAX,
+             step=1, key="year_slider", on_change=sync_from_slider)
+col_n.number_input("직접 입력", min_value=YEAR_MIN, max_value=YEAR_MAX,
+                   step=1, key="year_input", on_change=sync_from_input)
+
+year = int(st.session_state["year_slider"])
 pred = slope * year + intercept
 
 st.markdown(
